@@ -1,0 +1,504 @@
+<!-- index.html - 渲染进程界面 -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>记事本 & 待办</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background-color: #f5f5f7;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 顶部标签栏 */
+    .tab-bar {
+      display: flex;
+      background: #e8e8ed;
+      border-bottom: 1px solid #d1d1d6;
+      padding: 0 10px;
+    }
+    .tab-btn {
+      padding: 10px 20px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 14px;
+      color: #6c6c70;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      color: #007aff;
+      border-bottom-color: #007aff;
+      font-weight: 600;
+    }
+    .tab-btn:hover { color: #007aff; }
+
+    /* 面板通用 */
+    .panel { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+    .panel.active { display: flex; }
+
+    /* === 记事本面板 === */
+    .notepad-layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* 左侧笔记列表 */
+    .note-sidebar {
+      width: 200px;
+      min-width: 160px;
+      background: #f0f0f5;
+      border-right: 1px solid #d1d1d6;
+      display: flex;
+      flex-direction: column;
+    }
+    .note-sidebar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      border-bottom: 1px solid #d1d1d6;
+      font-size: 13px;
+      font-weight: 600;
+      color: #3a3a3c;
+    }
+    .note-sidebar-header button {
+      background: #007aff;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .note-sidebar-header button:hover { background: #005ecb; }
+    .note-list {
+      flex: 1;
+      overflow-y: auto;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .note-list-item {
+      padding: 10px 12px;
+      border-bottom: 1px solid #e5e5ea;
+      cursor: pointer;
+      transition: background 0.15s;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .note-list-item:hover { background: #e5e5ea; }
+    .note-list-item.active { background: #007aff; color: #fff; }
+    .note-list-item.active .note-item-time { color: rgba(255,255,255,0.7); }
+    .note-item-info { flex: 1; min-width: 0; }
+    .note-item-title {
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .note-item-time { font-size: 11px; color: #8e8e93; margin-top: 2px; }
+    .note-item-del {
+      background: none;
+      border: none;
+      color: #ff3b30;
+      font-size: 14px;
+      cursor: pointer;
+      padding: 2px 4px;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .note-list-item:hover .note-item-del { opacity: 1; }
+    .note-list-item.active .note-item-del { color: rgba(255,255,255,0.8); }
+    .note-empty-sidebar {
+      text-align: center;
+      color: #c7c7cc;
+      padding: 30px 10px;
+      font-size: 13px;
+    }
+
+    /* 右侧编辑器区域 */
+    .note-editor-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+    }
+    .note-title-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .note-title-row input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid #d1d1d6;
+      border-radius: 4px;
+      font-size: 15px;
+      font-weight: 500;
+    }
+    .note-title-row input:focus { outline: none; border-color: #007aff; }
+    .editor-toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .editor-toolbar button {
+      background-color: #ffffff;
+      border: 1px solid #d1d1d6;
+      border-radius: 4px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .editor-toolbar button:hover { background-color: #f0f0f0; }
+    .editor-toolbar button.active { background-color: #007aff; color: #fff; border-color: #007aff; }
+    .editor-toolbar .fmt-group { display: flex; gap: 2px; }
+    .editor-toolbar .fmt-group button { min-width: 34px; font-weight: 600; padding: 6px 8px; }
+    .editor-toolbar .fmt-sep { width: 1px; background: #d1d1d6; margin: 2px 6px; }
+    .editor-toolbar button.save-btn {
+      background: #007aff;
+      color: #fff;
+      border-color: #007aff;
+    }
+    .editor-toolbar button.save-btn:hover { background: #005ecb; }
+
+    #editor {
+      flex: 1;
+      border: none;
+      border-radius: 4px;
+      padding: 12px;
+      font-size: 16px;
+      line-height: 1.5;
+      resize: none;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+    }
+    #editor:focus { outline: none; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2); }
+    #editor:disabled { background: #fafafa; color: #c7c7cc; }
+
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      padding-top: 8px;
+      border-top: 1px solid #d1d1d6;
+      margin-top: 10px;
+      color: #6c6c70;
+      font-size: 12px;
+    }
+
+    /* === 待办列表面板 === */
+    .todo-panel-inner { padding: 16px; flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .todo-input-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .todo-input-row input[type="text"] {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid #d1d1d6;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    .todo-input-row input[type="text"]:focus { outline: none; border-color: #007aff; }
+    .todo-input-row input.desc-input { max-width: 260px; }
+    .todo-input-row button {
+      background-color: #ffffff;
+      border: 1px solid #d1d1d6;
+      border-radius: 4px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .todo-input-row button:hover { background-color: #f0f0f0; }
+    .todo-input-row button.primary {
+      background: #007aff;
+      color: #fff;
+      border-color: #007aff;
+    }
+    .todo-input-row button.primary:hover { background: #005ecb; }
+
+    .todo-filters {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .filter-btn {
+      padding: 4px 12px;
+      border: 1px solid #d1d1d6;
+      border-radius: 12px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 12px;
+      color: #6c6c70;
+    }
+    .filter-btn.active { background: #007aff; color: #fff; border-color: #007aff; }
+
+    .todo-list {
+      flex: 1;
+      overflow-y: auto;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .todo-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #fff;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+      transition: box-shadow 0.15s;
+    }
+    .todo-item:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    .todo-item.completed .todo-title { text-decoration: line-through; color: #aaa; }
+    .todo-item input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+    .todo-info { flex: 1; min-width: 0; }
+    .todo-title { font-size: 14px; font-weight: 500; word-break: break-word; }
+    .todo-desc { font-size: 12px; color: #8e8e93; margin-top: 2px; word-break: break-word; }
+    .todo-time { font-size: 11px; color: #c7c7cc; }
+    .todo-actions { display: flex; gap: 4px; }
+    .todo-actions button {
+      padding: 4px 8px;
+      font-size: 12px;
+      border-radius: 4px;
+      border: 1px solid #d1d1d6;
+      background: #fff;
+      cursor: pointer;
+    }
+    .todo-actions .del-btn { color: #ff3b30; border-color: #ff3b30; }
+    .todo-actions .del-btn:hover { background: #ff3b30; color: #fff; }
+    .todo-empty {
+      text-align: center;
+      color: #c7c7cc;
+      padding: 40px 0;
+      font-size: 14px;
+    }
+    .todo-status {
+      display: flex;
+      justify-content: space-between;
+      padding-top: 8px;
+      border-top: 1px solid #d1d1d6;
+      margin-top: 8px;
+      color: #8e8e93;
+      font-size: 12px;
+    }
+
+    /* === 自定义弹窗 === */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-box {
+      background: #fff;
+      border-radius: 10px;
+      padding: 24px;
+      min-width: 320px;
+      max-width: 420px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+    }
+    .modal-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #1c1c1e;
+    }
+    .modal-input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #d1d1d6;
+      border-radius: 6px;
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+    .modal-input:focus { outline: none; border-color: #007aff; }
+    .modal-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .modal-btn {
+      padding: 8px 20px;
+      border: 1px solid #d1d1d6;
+      border-radius: 6px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .modal-btn:hover { background: #f0f0f0; }
+    .modal-btn.primary {
+      background: #007aff;
+      color: #fff;
+      border-color: #007aff;
+    }
+    .modal-btn.primary:hover { background: #005ecb; }
+    .modal-btn.danger {
+      background: #ff3b30;
+      color: #fff;
+      border-color: #ff3b30;
+    }
+    .modal-btn.danger:hover { background: #d63029; }
+
+    /* 表单弹窗字段 */
+    .modal-field { margin-bottom: 14px; }
+    .modal-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: #3a3a3c;
+      margin-bottom: 4px;
+    }
+    .modal-field .modal-input {
+      width: 100%;
+      margin-bottom: 0;
+    }
+    .modal-textarea {
+      width: 100%;
+      min-height: 70px;
+      padding: 8px 12px;
+      border: 1px solid #d1d1d6;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+      resize: vertical;
+    }
+    .modal-textarea:focus { outline: none; border-color: #007aff; }
+
+    /* 选择器网格 */
+    #modalPicker {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+      max-height: 260px;
+      overflow-y: auto;
+    }
+    .picker-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border: 2px solid #e5e5ea;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-size: 13px;
+    }
+    .picker-item:hover { border-color: #007aff; background: #f0f6ff; }
+    .picker-item.selected { border-color: #007aff; background: #e8f0fe; }
+    .picker-swatch {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      border: 1px solid rgba(0,0,0,0.1);
+      flex-shrink: 0;
+    }
+    .picker-label {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  </style>
+</head>
+<body>
+  <!-- 标签栏 -->
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="notepad">记事本</button>
+    <button class="tab-btn" data-tab="todo">待办列表</button>
+  </div>
+
+  <!-- 记事本面板 -->
+  <div id="notepadPanel" class="panel active">
+    <div class="notepad-layout">
+      <!-- 左侧笔记列表 -->
+      <div class="note-sidebar">
+        <div class="note-sidebar-header">
+          <span>我的笔记</span>
+          <button id="newNoteBtn">+ 新建</button>
+        </div>
+        <ul class="note-list" id="noteList"></ul>
+      </div>
+      <!-- 右侧编辑器 -->
+      <div class="note-editor-area">
+        <div class="note-title-row">
+          <input type="text" id="noteTitleInput" placeholder="笔记标题..." disabled />
+        </div>
+        <div class="editor-toolbar">
+          <button id="saveNoteBtn" class="save-btn" disabled>保存</button>
+          <div class="fmt-sep"></div>
+          <div class="fmt-group">
+            <button id="boldBtn" title="加粗 (Ctrl+B)">B</button>
+            <button id="italicBtn" title="斜体 (Ctrl+I)" style="font-style:italic">I</button>
+            <button id="underlineBtn" title="下划线 (Ctrl+U)" style="text-decoration:underline">U</button>
+            <button id="strikeBtn" title="删除线" style="text-decoration:line-through">S</button>
+          </div>
+          <div class="fmt-sep"></div>
+          <button id="normalBtn" title="清除格式">常规</button>
+          <button id="fontBtn">字体</button>
+          <button id="colorBtn">颜色</button>
+        </div>
+        <textarea id="editor" placeholder="选择或新建一篇笔记..." disabled></textarea>
+        <div class="status-bar">
+          <span>字符数: <span id="charCount">0</span></span>
+          <span id="noteSaveStatus" style="color:#8e8e93;"></span>
+          <span>字数: <span id="wordCount">0</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 待办列表面板 -->
+  <div id="todoPanel" class="panel">
+    <div class="todo-panel-inner">
+      <div class="todo-input-row">
+        <input type="text" id="todoTitleInput" placeholder="输入待办事项..." />
+        <input type="text" id="todoDescInput" class="desc-input" placeholder="描述（可选）" />
+        <button id="addTodoBtn" class="primary">添加</button>
+      </div>
+      <div class="todo-filters">
+        <button class="filter-btn active" data-filter="all">全部</button>
+        <button class="filter-btn" data-filter="pending">未完成</button>
+        <button class="filter-btn" data-filter="done">已完成</button>
+      </div>
+      <ul class="todo-list" id="todoList"></ul>
+      <div class="todo-status">
+        <span id="todoStats">共 0 项，已完成 0 项</span>
+        <span id="backendStatus" style="color:#8e8e93;">连接中...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 自定义弹窗 -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-box">
+      <div class="modal-title" id="modalTitle"></div>
+      <input class="modal-input" id="modalInput" style="display:none" />
+      <div id="modalForm" style="display:none"></div>
+      <div id="modalPicker" style="display:none"></div>
+      <div class="modal-buttons">
+        <button class="modal-btn" id="modalCancel">取消</button>
+        <button class="modal-btn primary" id="modalOk">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./renderer.js"></script>
+</body>
+</html>

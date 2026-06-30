@@ -1,0 +1,26 @@
+{
+  "name": "electron-notepad",
+  "version": "1.0.0",
+  "description": "A simple notepad application built with Electron",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "keywords": [
+    "notepad",
+    "text-editor",
+    "electron",
+    "desktop-app"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^25.1.8"
+  }
+}
